@@ -105,9 +105,13 @@ try {
     # Create the share
     New-SmbShare -Name $shareName -Path $ssFolderPath -Description "Shared folder for SS" -ErrorAction Stop
 
-    # Set Read/Write (Change) permissions for Everyone
-    Write-Host "Setting access permissions for '$shareName' (Everyone: Change)..."
-    Grant-SmbShareAccess -Name $shareName -AccountName "Everyone" -AccessRight Change -Force -ErrorAction Stop
+    # Set Read/Write (Change) permissions for Everyone.
+    # Resolve the group by its well-known SID (S-1-1-0) so the account name is
+    # correct on any UI language (e.g. "Все" on Russian Windows) — passing the
+    # literal "Everyone" fails with error 1332 on non-English systems.
+    $everyoneName = ([System.Security.Principal.SecurityIdentifier]'S-1-1-0').Translate([System.Security.Principal.NTAccount]).Value
+    Write-Host "Setting access permissions for '$shareName' ($everyoneName: Change)..."
+    Grant-SmbShareAccess -Name $shareName -AccountName $everyoneName -AccessRight Change -Force -ErrorAction Stop
 
     Write-Host "Network share '$shareName' created and configured successfully." -ForegroundColor Green
 } catch {
