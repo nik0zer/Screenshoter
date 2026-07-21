@@ -16,6 +16,9 @@
 // --- Константы ---
 const int HOTKEY_SCREENSHOT_ID = 1;
 const int HOTKEY_EXIT_ID = 2;
+const int HOTKEY_AUTO_ID = 3;              // Переключение автоматического режима
+const UINT_PTR AUTO_TIMER_ID = 1;          // Идентификатор таймера авто-скриншотов
+const UINT AUTO_INTERVAL_MS = 60 * 1000;   // Интервал авто-скриншотов: 1 минута
 const std::wstring SAVE_DIRECTORY = L"C:\\SS"; // Папка для сохранения
 
 // --- Прототипы функций ---
@@ -67,8 +70,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         Gdiplus::GdiplusShutdown(gdiplusToken);
         return 1; // Тихий выход при ошибке регистрации
     }
+    // Ctrl+Shift+Z. Переключение автоматического режима (скриншот раз в минуту).
+    if (!RegisterHotKey(NULL, HOTKEY_AUTO_ID, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 'Z')) {
+        UnregisterHotKey(NULL, HOTKEY_SCREENSHOT_ID);
+        UnregisterHotKey(NULL, HOTKEY_EXIT_ID);
+        Gdiplus::GdiplusShutdown(gdiplusToken);
+        return 1; // Тихий выход при ошибке регистрации
+    }
 
     // 3. Цикл обработки сообщений
+    bool autoModeEnabled = false; // Состояние автоматического режима
     MSG msg = {0};
     while (GetMessage(&msg, NULL, 0, 0) > 0)
     {
@@ -82,16 +93,46 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             {
                 TakeScreenshotAndSave();
             }
+            else if (msg.wParam == HOTKEY_AUTO_ID)
+            {
+                // Переключаем автоматический режим (скриншот раз в минуту)
+                if (!autoModeEnabled)
+                {
+                    // Таймер без окна: WM_TIMER придёт в очередь потока
+                    if (SetTimer(NULL, AUTO_TIMER_ID, AUTO_INTERVAL_MS, NULL) != 0)
+                    {
+                        autoModeEnabled = true;
+                        TakeScreenshotAndSave(); // Первый кадр сразу при включении
+                    }
+                }
+                else
+                {
+                    KillTimer(NULL, AUTO_TIMER_ID);
+                    autoModeEnabled = false;
+                }
+            }
             else if (msg.wParam == HOTKEY_EXIT_ID)
             {
+                if (autoModeEnabled)
+                {
+                    KillTimer(NULL, AUTO_TIMER_ID);
+                    autoModeEnabled = false;
+                }
                 PostQuitMessage(0); // Завершаем цикл сообщений
             }
         }
+        else if (msg.message == WM_TIMER && msg.wParam == AUTO_TIMER_ID)
+        {
+            // Срабатывание таймера автоматического режима
+            TakeScreenshotAndSave();
+        }
     }
 
-    // 4. Отмена регистрации горячих клавиш перед выходом
+    // 4. Отмена регистрации горячих клавиш и таймера перед выходом
+    if (autoModeEnabled) KillTimer(NULL, AUTO_TIMER_ID);
     UnregisterHotKey(NULL, HOTKEY_SCREENSHOT_ID);
     UnregisterHotKey(NULL, HOTKEY_EXIT_ID);
+    UnregisterHotKey(NULL, HOTKEY_AUTO_ID);
 
     // Завершение работы с GDI+
     Gdiplus::GdiplusShutdown(gdiplusToken);
