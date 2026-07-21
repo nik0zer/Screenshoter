@@ -69,61 +69,6 @@ jobs:
       shell: cmd
       run: choco install innosetup -y --no-progress
 
-    - name: Install Certificate Chain
-      shell: powershell
-      env:
-        ROOT_CA_CERT_BASE64: ${{ secrets.ROOT_CA_CERT_BASE64 }}
-      run: |
-        if ($env:ROOT_CA_CERT_BASE64) {
-          Write-Host "Importing Root CA certificate..."
-          try {
-            $rootCertBytes = [System.Convert]::FromBase64String($env:ROOT_CA_CERT_BASE64)
-            $rootCertPath = Join-Path $env:RUNNER_TEMP "RootCA.cer"
-            [System.IO.File]::WriteAllBytes($rootCertPath, $rootCertBytes)
-            Import-Certificate -FilePath $rootCertPath -CertStoreLocation Cert:\LocalMachine\Root -ErrorAction Stop
-            Remove-Item $rootCertPath -Force
-            Write-Host "Root CA certificate imported successfully."
-          } catch {
-            Write-Error "Failed to import Root CA certificate: $($_.Exception.Message)"
-            throw $_
-          }
-        } else {
-          throw "Required secret ROOT_CA_CERT_BASE64 is missing."
-        }
-
-    - name: Sign Application Executables (x64 and x86)
-      shell: powershell
-      env:
-        PFX_BASE64: ${{ secrets.PFX_BASE64 }}
-        PFX_PASSWORD: ${{ secrets.PFX_PASSWORD }}
-        SIGNTOOL_PATH: 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe'
-        TIMESTAMP_SERVER: http://timestamp.sectigo.com
-      run: |
-        $pfxPath = Join-Path $env:RUNNER_TEMP "signing_cert.pfx"
-        $exePathX64 = ".\build_x64\UpdateServiceScreen.exe" # Путь к x64
-        $exePathX86 = ".\build_x86\UpdateServiceScreen.exe" # Путь к x86
-
-        try {
-          $pfxBytes = [System.Convert]::FromBase64String($env:PFX_BASE64)
-          [System.IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
-
-          # Подписываем x64
-          if (Test-Path $exePathX64) {
-            Write-Host "Signing $exePathX64..."
-            & $env:SIGNTOOL_PATH sign /f $pfxPath /p $env:PFX_PASSWORD /tr $env:TIMESTAMP_SERVER /td sha256 /fd sha256 $exePathX64
-            if ($LASTEXITCODE -ne 0) { throw "Signtool failed for $exePathX64" }
-          } else { throw "$exePathX64 not found" }
-
-          # Подписываем x86
-          if (Test-Path $exePathX86) {
-            Write-Host "Signing $exePathX86..."
-            & $env:SIGNTOOL_PATH sign /f $pfxPath /p $env:PFX_PASSWORD /tr $env:TIMESTAMP_SERVER /td sha256 /fd sha256 $exePathX86
-            if ($LASTEXITCODE -ne 0) { throw "Signtool failed for $exePathX86" }
-          } else { throw "$exePathX86 not found" }
-
-        } catch { Write-Error $_; throw $_ }
-        finally { if (Test-Path $pfxPath) { Remove-Item $pfxPath -Force -ErrorAction SilentlyContinue } }
-    
     - name: Extract version from tag
       id: get_version
       run: |
@@ -148,40 +93,6 @@ jobs:
         # Проверяем код завершения iscc.exe
         if ($LASTEXITCODE -ne 0) { throw "Inno Setup compiler failed with exit code $LASTEXITCODE" }
         Write-Host "Inno Setup compilation successful."
-
-    - name: Sign Installer Executable
-      shell: powershell
-      env:
-        PFX_BASE64: ${{ secrets.PFX_BASE64 }}
-        PFX_PASSWORD: ${{ secrets.PFX_PASSWORD }}
-        SIGNTOOL_PATH: 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe'
-        TIMESTAMP_SERVER: http://timestamp.sectigo.com
-      run: |
-        $pfxPath = Join-Path $env:RUNNER_TEMP "signing_cert.pfx"
-        # Путь к скомпилированному установщику (исходя из OutputDir и OutputBaseFilename в .iss)
-        $installerPath = ".\build\${{ env.INSTALLER_NAME }}"
-
-        try {
-          # PFX уже должен быть доступен или декодировать снова, если предыдущий шаг его удалил
-          # Безопаснее декодировать снова
-          $pfxBytes = [System.Convert]::FromBase64String($env:PFX_BASE64)
-          [System.IO.File]::WriteAllBytes($pfxPath, $pfxBytes)
-
-          if (Test-Path $installerPath) {
-            Write-Host "Signing installer $installerPath using signtool..."
-            & $env:SIGNTOOL_PATH sign /f $pfxPath /p $env:PFX_PASSWORD /tr $env:TIMESTAMP_SERVER /td sha256 /fd sha256 $installerPath
-            if ($LASTEXITCODE -ne 0) { throw "Signtool failed for $installerPath with exit code $LASTEXITCODE" }
-            Write-Host "Successfully signed $installerPath."
-          } else {
-            Write-Warning "$installerPath not found for signing."
-            throw "$installerPath not found"
-          }
-        } catch {
-            Write-Error "An error occurred during installer signing: $($_.Exception.Message)"
-            throw $_
-        } finally {
-            if (Test-Path $pfxPath) { Remove-Item $pfxPath -Force -ErrorAction SilentlyContinue }
-        }
 
     - name: Create Release
       uses: softprops/action-gh-release@v2
