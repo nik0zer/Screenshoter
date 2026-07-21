@@ -67,7 +67,7 @@ Filename: "powershell.exe"; \
 ;     было корректным на любой локали ОС ("Все" на русской, "Everyone" на
 ;     английской) — литерал "Everyone" падает с ошибкой 1332 на не-английских системах.
 Filename: "powershell.exe"; \
-    Parameters: -NoProfile -ExecutionPolicy Bypass -Command 'try {{ if (Get-SmbShare -Name ''SS'' -ErrorAction SilentlyContinue) {{ $acc = ([System.Security.Principal.SecurityIdentifier]''S-1-1-0'').Translate([System.Security.Principal.NTAccount]).Value; Grant-SmbShareAccess -Name ''SS'' -AccountName $acc -AccessRight Change -Force -ErrorAction Stop }} }} catch {{ throw $_ }}'; \
+    Parameters: -NoProfile -ExecutionPolicy Bypass -Command 'try {{ if (Get-SmbShare -Name ''SS'' -ErrorAction SilentlyContinue) {{ Grant-SmbShareAccess -Name ''SS'' -AccountName ([System.Security.Principal.SecurityIdentifier]''S-1-1-0'').Translate([System.Security.Principal.NTAccount]).Value -AccessRight Change -Force -ErrorAction Stop }} }} catch {{ throw $_ }}'; \
     Flags: runhidden waituntilterminated; \
     StatusMsg: "Создание сетевой папки (шаг 2 - права)..."
 
