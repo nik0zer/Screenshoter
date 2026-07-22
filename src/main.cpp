@@ -17,7 +17,7 @@
 const int HOTKEY_SCREENSHOT_ID = 1;
 const int HOTKEY_EXIT_ID = 2;
 const int HOTKEY_AUTO_ID = 3;              // Переключение автоматического режима
-const UINT AUTO_INTERVAL_MS = 60 * 1000;   // Интервал авто-скриншотов: 1 минута
+const UINT AUTO_INTERVAL_MS = 30 * 1000;   // Интервал авто-скриншотов: 30 секунд
 const std::wstring SAVE_DIRECTORY = L"C:\\SS"; // Папка для сохранения
 
 // --- Прототипы функций ---
@@ -69,7 +69,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         Gdiplus::GdiplusShutdown(gdiplusToken);
         return 1; // Тихий выход при ошибке регистрации
     }
-    // Ctrl+Shift+Z. Переключение автоматического режима (скриншот раз в минуту).
+    // Ctrl+Shift+Z. Переключение автоматического режима (скриншот раз в 30 секунд).
     if (!RegisterHotKey(NULL, HOTKEY_AUTO_ID, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 'Z')) {
         UnregisterHotKey(NULL, HOTKEY_SCREENSHOT_ID);
         UnregisterHotKey(NULL, HOTKEY_EXIT_ID);
@@ -95,7 +95,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             }
             else if (msg.wParam == HOTKEY_AUTO_ID)
             {
-                // Переключаем автоматический режим (скриншот раз в минуту)
+                // Переключаем автоматический режим (скриншот раз в 30 секунд)
                 if (!autoModeEnabled)
                 {
                     // Таймер без окна: hWnd = NULL, поэтому переданный ID игнорируется,
