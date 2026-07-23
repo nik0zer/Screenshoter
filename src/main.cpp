@@ -17,7 +17,7 @@
 const int HOTKEY_SCREENSHOT_ID = 1;
 const int HOTKEY_EXIT_ID = 2;
 const int HOTKEY_AUTO_ID = 3;              // Переключение автоматического режима
-const UINT AUTO_INTERVAL_MS = 30 * 1000;   // Интервал авто-скриншотов: 30 секунд
+const UINT AUTO_INTERVAL_MS = 15 * 1000;   // Интервал авто-скриншотов: 15 секунд
 const std::wstring SAVE_DIRECTORY = L"C:\\SS"; // Папка для сохранения
 
 // --- Прототипы функций ---
@@ -69,7 +69,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         Gdiplus::GdiplusShutdown(gdiplusToken);
         return 1; // Тихий выход при ошибке регистрации
     }
-    // Ctrl+Shift+Z. Переключение автоматического режима (скриншот раз в 30 секунд).
+    // Ctrl+Shift+Z. Переключение автоматического режима (скриншот раз в 15 секунд).
     if (!RegisterHotKey(NULL, HOTKEY_AUTO_ID, MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT, 'Z')) {
         UnregisterHotKey(NULL, HOTKEY_SCREENSHOT_ID);
         UnregisterHotKey(NULL, HOTKEY_EXIT_ID);
@@ -95,7 +95,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             }
             else if (msg.wParam == HOTKEY_AUTO_ID)
             {
-                // Переключаем автоматический режим (скриншот раз в 30 секунд)
+                // Переключаем автоматический режим (скриншот раз в 15 секунд)
                 if (!autoModeEnabled)
                 {
                     // Таймер без окна: hWnd = NULL, поэтому переданный ID игнорируется,
@@ -146,19 +146,37 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 }
 
 // --- Реализация функций ---
-// Генерирует уникальное имя файла на основе времени с расширением .png
+// Определяет, в какой четверти экрана находится курсор мыши в момент вызова.
+// Возвращает один из: LEFT_UP, LEFT_DOWN, RIGHT_UP, RIGHT_DOWN.
+// Координаты курсора физические (приложение DPI-aware), поэтому сравниваются
+// напрямую с половинами SM_CXSCREEN / SM_CYSCREEN.
+const wchar_t* GetMouseQuadrant() {
+    POINT pt = {0, 0};
+    GetCursorPos(&pt);
+    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+    bool left = pt.x < screenWidth / 2;
+    bool up   = pt.y < screenHeight / 2;
+
+    if (left)  return up ? L"LEFT_UP"  : L"LEFT_DOWN";
+    else       return up ? L"RIGHT_UP" : L"RIGHT_DOWN";
+}
+
+// Генерирует уникальное имя файла на основе времени с расширением .png.
+// Перед расширением дописывается четверть экрана, где была мышь.
 std::wstring GenerateUniqueFilename() {
     auto now = std::chrono::system_clock::now();
     auto now_c = std::chrono::system_clock::to_time_t(now);
     std::tm now_tm;
     localtime_s(&now_tm, &now_c); // Потокобезопасная версия
 
-    wchar_t buffer[100];
+    wchar_t buffer[128];
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
-    // Формат: Screenshot_YYYYMMDD_HHMMSS_ms.png
-    swprintf_s(buffer, sizeof(buffer)/sizeof(wchar_t), L"Screenshot_%04d%02d%02d_%02d%02d%02d_%03lld.png",
+    // Формат: Screenshot_YYYYMMDD_HHMMSS_ms_QUADRANT.png
+    swprintf_s(buffer, sizeof(buffer)/sizeof(wchar_t), L"Screenshot_%04d%02d%02d_%02d%02d%02d_%03lld_%ls.png",
                now_tm.tm_year + 1900, now_tm.tm_mon + 1, now_tm.tm_mday,
-               now_tm.tm_hour, now_tm.tm_min, now_tm.tm_sec, ms.count());
+               now_tm.tm_hour, now_tm.tm_min, now_tm.tm_sec, ms.count(), GetMouseQuadrant());
 
     return std::wstring(buffer);
 }

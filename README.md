@@ -2,11 +2,15 @@
 ## Hotkeys
 - Start program: `ctrl+shift+]`
 - Take screenshot: `ctrl+shift+'`
-- Toggle auto mode (screenshot every 30 seconds): `ctrl+shift+z`
+- Toggle auto mode (screenshot every 15 seconds): `ctrl+shift+z`
 - Close program: `ctrl+shift+,`
 
 `ctrl+shift+z` toggles automatic mode: while enabled, a screenshot is taken
-immediately and then once every 30 seconds until you press the combination again.
+immediately and then once every 15 seconds until you press the combination again.
+
+Each screenshot filename ends (before the `.png` extension) with the screen
+quadrant where the mouse cursor was at capture time: `LEFT_UP`, `LEFT_DOWN`,
+`RIGHT_UP`, or `RIGHT_DOWN`.
 
 Screenshots you can find in `C:\SS` wich is shared in local net via `install.ps1`.
 
